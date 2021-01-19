@@ -30,8 +30,9 @@ class Model(nn.Module):
 
         if not isinstance(backbones, list):
             backbones = [backbones]
-
+        # self.backbone = getattr(backbones_mod, backbones[0])
         self.backbones = nn.ModuleDict({b: getattr(backbones_mod, b)() for b in backbones})
+        # self.backbone = 
         self.name = 'RetinaNet'
         self.exporting = False
         self.rotated_bbox = rotated_bbox
@@ -50,6 +51,7 @@ class Model(nn.Module):
         self.detections = config.get('detections', 100)
 
         self.stride = max([b.stride for _, b in self.backbones.items()])
+        # self.stride = self.backbone.stride
 
         # classification and box regression heads
         def make_head(out_size):
@@ -127,6 +129,7 @@ class Model(nn.Module):
         features = []
         for _, backbone in self.backbones.items():
             features.extend(backbone(x))
+        # features.extend(self.backbone(x))
 
         # Heads forward pass
         cls_heads = [self.cls_head(t) for t in features]
@@ -207,15 +210,15 @@ class Model(nn.Module):
         box_loss = torch.stack(box_losses).sum() / fg_targets
         return cls_loss, box_loss
 
-    def save(self, state):
+    def save(self, state, f_loss, b_loss):
         checkpoint = {
-            'backbone': [k for k, _ in self.backbones.items()],
+            'backbone': self.backbones.state_dict(),
             'classes': self.classes,
             'state_dict': self.state_dict(),
             'ratios': self.ratios,
             'scales': self.scales,
-            'box_head': self.box_head,
-            'cls_head': self.cls_head
+            'box_head': self.box_head.state_dict(),
+            'cls_head': self.cls_head.state_dict()
         }
         if self.rotated_bbox and self.angles:
             checkpoint['angles'] = self.angles
@@ -224,10 +227,10 @@ class Model(nn.Module):
             if key in state:
                 checkpoint[key] = state[key]
 
-        torch.save(checkpoint, state['path'])
+        torch.save(checkpoint, state['path'] + '_{:.5}_{:.5}.pth'.format(f_loss, b_loss))
 
-    @classmethod
-    def load(cls, filename, rotated_bbox=False):
+    # @classmethod
+    def load(self, filename, rotated_bbox=False):
         if not os.path.isfile(filename):
             raise ValueError('No checkpoint {}'.format(filename))
 
@@ -239,8 +242,12 @@ class Model(nn.Module):
         if ('angles' in checkpoint) or rotated_bbox:
             kwargs['rotated_bbox'] = True
         # Recreate model from checkpoint instead of from individual backbones
-        model = cls(backbones=checkpoint['backbone'], classes=checkpoint['classes'], **kwargs)
-        model.load_state_dict(checkpoint['state_dict'])
+        # model = cls(backbones=checkpoint['backbone'], classes=checkpoint['classes'], **kwargs)
+        # self.backbones.load_state_dict(checkpoint['state_dict'])
+        self.backbones.load_state_dict(checkpoint['backbone']) # = [k.load_state_dict(checkpoint['state_dict']) for k, _ in self.backbones.items()]
+        self.cls_head.load_state_dict(checkpoint['cls_head'])
+        self.box_head.load_state_dict(checkpoint['box_head'])
+        
 
         state = {}
         for key in ('iteration', 'optimizer', 'scheduler'):
@@ -250,7 +257,7 @@ class Model(nn.Module):
         del checkpoint
         torch.cuda.empty_cache()
 
-        return model, state
+        return state
     
     def load_cls_head(self, filename, rotate_box=False):
         if not os.path.isfile(filename):

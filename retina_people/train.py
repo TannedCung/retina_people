@@ -77,11 +77,11 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
         print('Training model for {} iterations...'.format(iterations))
 
     # Create TensorBoard writer
-    if logdir is not None:
-        from torch.utils.tensorboard import SummaryWriter
-        if is_master and verbose:
-            print('Writing TensorBoard logs to: {}'.format(logdir))
-        writer = SummaryWriter(log_dir=logdir)
+    # if logdir is not None:
+    #     from torch.utils.tensorboard import SummaryWriter
+    #     if is_master and verbose:
+    #         print('Writing TensorBoard logs to: {}'.format(logdir))
+    #     writer = SummaryWriter(log_dir=logdir)
 
     profiler = Profiler(['train', 'fw', 'bw'])
     iteration = state.get('iteration', 0)
@@ -141,19 +141,19 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
                     msg += ', lr: {:.2g}'.format(learning_rate)
                     print(msg, flush=True)
 
-                if logdir is not None:
-                    writer.add_scalar('focal_loss', focal_loss, iteration)
-                    writer.add_scalar('box_loss', box_loss, iteration)
-                    writer.add_scalar('learning_rate', learning_rate, iteration)
-                    del box_loss, focal_loss
+                # if logdir is not None:
+                #     writer.add_scalar('focal_loss', focal_loss, iteration)
+                #     writer.add_scalar('box_loss', box_loss, iteration)
+                #     writer.add_scalar('learning_rate', learning_rate, iteration)
+                #     del box_loss, focal_loss
 
-                if metrics_url:
-                    post_metrics(metrics_url, {
-                        'focal loss': mean(cls_losses),
-                        'box loss': mean(box_losses),
-                        'im_s': batch_size / profiler.means['train'],
-                        'lr': learning_rate
-                    })
+                # if metrics_url:
+                #     post_metrics(metrics_url, {
+                #         'focal loss': mean(cls_losses),
+                #         'box loss': mean(box_losses),
+                #         'im_s': batch_size / profiler.means['train'],
+                #         'lr': learning_rate
+                #     })
 
                 # Save model weights
                 state.update({
@@ -162,7 +162,7 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
                     'scheduler': scheduler.state_dict(),
                 })
                 with ignore_sigint():
-                    nn_model.save(state)
+                    nn_model.save(state, f_loss=focal_loss, b_loss=box_loss)
 
                 profiler.reset()
                 del cls_losses[:], box_losses[:]
@@ -176,5 +176,5 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
             if (iteration==iterations and not rotated_bbox) or (iteration>iterations and rotated_bbox):
                 break
 
-    if logdir is not None:
-        writer.close()
+    # if logdir is not None:
+    #     writer.close()
