@@ -24,13 +24,13 @@ def parse(args):
 
 
     parser_train = subparsers.add_parser('train', help='train a network')
-    parser_train.add_argument('model', type=str, help='path to output model or checkpoint to resume from', default="retinanet/checkpoints/checkpoint.pth" )
+    parser_train.add_argument('model', type=str, help='path to output model or checkpoint to resume from')
     parser_train.add_argument('--annotations', metavar='path', type=str, help='path to COCO style annotations',
                               required=False, default="retinanet/data/annotations/person_keypoints_train2017.json")
     parser_train.add_argument('--images', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                               default=['MobileNetV2FPN'])
-    parser_train.add_argument('--cont', metavar='pretrain', type=bool, help='is training from last checkpoint', default=False)
+    parser_train.add_argument('-cont', help='is training from last checkpoint', action='store_true')
     parser_train.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=3)
     parser_train.add_argument('--resize', metavar='scale', type=int, help='resize to given size', default=800)
