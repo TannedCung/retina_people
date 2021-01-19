@@ -30,6 +30,7 @@ def parse(args):
     parser_train.add_argument('--images', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                               default=['MobileNetV2FPN'])
+    parser_train.add_argument('--cont', metavar='pretrain', type=bool, help='is training from last checkpoint', default=False)
     parser_train.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=3)
     parser_train.add_argument('--resize', metavar='scale', type=int, help='resize to given size', default=800)
@@ -123,18 +124,23 @@ def load_model(args, verbose=False):
 
     model = None
     state = {}
-    _, ext = os.path.splitext(args.model)
+    name, ext = os.path.splitext(args.model)
 
     if args.command == 'train' and (not os.path.exists(args.model) or args.override):
         if verbose: print('Initializing model...')
         model = Model(backbones=args.backbone, classes=args.classes, rotated_bbox=args.rotated_bbox,
                       anchor_ious=args.anchor_ious)
-        model.initialize(args.fine_tune)
+
+        if args.cont:
+            state = model.load(filename=args.model, rotated_bbox=args.rotated_bbox)
+            print("INFO: Pretrained model loaded from {}".format(args.model))
+        # model.initialize(args.fine_tune)
         if verbose: print(model)
 
     elif ext == '.pth' or ext == '.torch':
         if verbose: print('Loading model from {}...'.format(os.path.basename(args.model)))
         state = Model.load(filename=args.model, rotated_bbox=args.rotated_bbox)
+        print("about to load model from {}".format(args.model))
         if verbose: print(model)
 
     elif args.command == 'infer' and ext in ['.engine', '.plan']:
@@ -143,7 +149,8 @@ def load_model(args, verbose=False):
     else:
         raise RuntimeError('Invalid model format "{}"!'.format(args.ext))
 
-    state['path'] = args.model
+    # state['path'] = args.model
+    state['path'] = name
     return model, state
 
 
