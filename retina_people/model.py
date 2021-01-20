@@ -229,7 +229,7 @@ class Model(nn.Module):
 
         torch.save(checkpoint, state['path'])
     # @classmethod
-    def load(self, filename, rotated_bbox=False):
+    def load(self, filename, rotated_bbox=False, reinit_opt=True):
         if not os.path.isfile(filename):
             raise ValueError('No checkpoint {}'.format(filename))
 
@@ -251,7 +251,10 @@ class Model(nn.Module):
         state = {}
         for key in ('iteration', 'optimizer', 'scheduler'):
             if key in checkpoint:
-                state[key] = checkpoint[key]
+                if key != 'optimizer': 
+                    state[key] = checkpoint[key]
+                elif not reinit_opt:
+                    state[key] = checkpoint[key]
 
         del checkpoint
         torch.cuda.empty_cache()

@@ -32,8 +32,9 @@ def parse(args):
                               default=['MobileNetV2FPN'])
     parser_train.add_argument('--last-checkpoint', action='store', type=str, help='path to the last checkpoint to resume training from')
     parser_train.add_argument('-cont', help='is training from last checkpoint', action='store_true')
+    parser_train.add_argument('-reinit_opt', help='set another learning from last checkpoint', action='store_true')
     parser_train.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
-    parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=3)
+    parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=1)
     parser_train.add_argument('--resize', metavar='scale', type=int, help='resize to given size', default=800)
     parser_train.add_argument('--max-size', metavar='max', type=int, help='maximum resizing size', default=1333)
     parser_train.add_argument('--jitter', metavar='min max', type=int, nargs=2, help='jitter size within range',
@@ -45,7 +46,7 @@ def parse(args):
     parser_train.add_argument('--schedule', metavar='scale', type=float,
                               help='scale schedule (affecting iters and milestones)', default=1)
     parser_train.add_argument('--full-precision', help='train in full precision', action='store_true')
-    parser_train.add_argument('--lr', metavar='value', help='learning rate', type=float, default=0.001)
+    parser_train.add_argument('--lr', metavar='value', help='learning rate', type=float, default=0.0001)
     parser_train.add_argument('--warmup', metavar='iterations', help='numer of warmup iterations', type=int,
                               default=1000)
     parser_train.add_argument('--gamma', metavar='value', type=float,
@@ -133,7 +134,7 @@ def load_model(args, verbose=False):
                       anchor_ious=args.anchor_ious)
 
         if args.cont:
-            state = model.load(filename=args.last_checkpoint, rotated_bbox=args.rotated_bbox)
+            state = model.load(filename=args.last_checkpoint, rotated_bbox=args.rotated_bbox, reinit_opt=args.reinit_opt)
             print("INFO: Pretrained model loaded from {}".format(args.last_checkpoint))
         # model.initialize(args.fine_tune)
         if verbose: print(model)
@@ -191,15 +192,15 @@ def worker(rank, args, world, model, state):
                     augment_hue=args.augment_hue, augment_saturation=args.augment_saturation,
                     regularization_l2=args.regularization_l2, rotated_bbox=args.rotated_bbox, absolute_angle=args.absolute_angle)
 
-    # elif args.command == 'infer':
-    #     if model is None:
-    #         if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
-    #         model = Engine.load(args.model)
+    elif args.command == 'infer':
+        if model is None:
+            if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
+            model = Engine.load(args.model)
 
-    #     infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
-    #                 annotations=args.annotations, mixed_precision=not args.full_precision,
-    #                 is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
-    #                 rotated_bbox=args.rotated_bbox)
+        infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
+                    annotations=args.annotations, mixed_precision=not args.full_precision,
+                    is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
+                    rotated_bbox=args.rotated_bbox)
 
     elif args.command == 'export':
         onnx_only = args.export.split('.')[-1] == 'onnx'
