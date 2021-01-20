@@ -30,6 +30,7 @@ def parse(args):
     parser_train.add_argument('--images', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                               default=['MobileNetV2FPN'])
+    parser_train.add_argument('--last-checkpoint', action='store', type=str, help='path to the last checkpoint to resume training from')
     parser_train.add_argument('-cont', help='is training from last checkpoint', action='store_true')
     parser_train.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=3)
@@ -132,8 +133,8 @@ def load_model(args, verbose=False):
                       anchor_ious=args.anchor_ious)
 
         if args.cont:
-            state = model.load(filename=args.model, rotated_bbox=args.rotated_bbox)
-            print("INFO: Pretrained model loaded from {}".format(args.model))
+            state = model.load(filename=args.last_checkpoint, rotated_bbox=args.rotated_bbox)
+            print("INFO: Pretrained model loaded from {}".format(args.last_checkpoint))
         # model.initialize(args.fine_tune)
         if verbose: print(model)
 
