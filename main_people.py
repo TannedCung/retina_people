@@ -192,15 +192,15 @@ def worker(rank, args, world, model, state):
                     augment_hue=args.augment_hue, augment_saturation=args.augment_saturation,
                     regularization_l2=args.regularization_l2, rotated_bbox=args.rotated_bbox, absolute_angle=args.absolute_angle)
 
-    elif args.command == 'infer':
-        if model is None:
-            if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
-            model = Engine.load(args.model)
+    # elif args.command == 'infer':
+    #     if model is None:
+    #         if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
+    #         model = Engine.load(args.model)
 
-        infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
-                    annotations=args.annotations, mixed_precision=not args.full_precision,
-                    is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
-                    rotated_bbox=args.rotated_bbox)
+    #     infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
+    #                 annotations=args.annotations, mixed_precision=not args.full_precision,
+    #                 is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
+    #                 rotated_bbox=args.rotated_bbox)
 
     elif args.command == 'export':
         onnx_only = args.export.split('.')[-1] == 'onnx'
