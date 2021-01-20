@@ -227,8 +227,7 @@ class Model(nn.Module):
             if key in state:
                 checkpoint[key] = state[key]
 
-        torch.save(checkpoint, state['path'] + '_{:.5}_{:.5}.pth'.format(f_loss, b_loss))
-
+        torch.save(checkpoint, state['path'])
     # @classmethod
     def load(self, filename, rotated_bbox=False):
         if not os.path.isfile(filename):

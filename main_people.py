@@ -124,7 +124,7 @@ def load_model(args, verbose=False):
 
     model = None
     state = {}
-    name, ext = os.path.splitext(args.model)
+    _, ext = os.path.splitext(args.model)
 
     if args.command == 'train' and (not os.path.exists(args.model) or args.override):
         if verbose: print('Initializing model...')
@@ -149,8 +149,8 @@ def load_model(args, verbose=False):
     else:
         raise RuntimeError('Invalid model format "{}"!'.format(args.ext))
 
-    # state['path'] = args.model
-    state['path'] = name
+    state['path'] = args.model
+    # state['path'] = name
     return model, state
 
 
