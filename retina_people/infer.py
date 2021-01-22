@@ -7,6 +7,9 @@ from apex import amp
 from apex.parallel import DistributedDataParallel as DDP
 from pycocotools.cocoeval import COCOeval
 import numpy as np
+import cv2
+from PIL import Image
+import torch.nn.functional as F
 
 from .data import DataIterator, RotatedDataIterator
 from .dali import DaliDataIterator
@@ -167,3 +170,55 @@ def infer(model, path, detections_file, resize, max_size, batch_size, mixed_prec
                 coco_eval.summarize()
         else:
             print('No detections!')
+
+
+# def preprocess(img, stride,resize, max_size, mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]):
+#     img = Image.fromarray(img).convert("RGB")
+#     ratio = resize / min(img.size)
+#     if max(img.size) > max_size:
+#         ratio = max_size / max(img.size)
+#         img = img.resize((int(ratio * d) for d in img.size), Image.BILINEAR)
+#     data = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
+#     data = data.float().div(255).view(*img.size[::-1], len(img.mode))
+#     data = data.permute(2, 0, 1)
+#     for t, mean, std in zip(data, mean, std):
+#         t.sub_(mean).div_(std)
+    
+#     pw, ph = ((stride - d % stride) % stride for d in img.size)
+#     data = F.pad(data, (0, pw, 0, ph))
+#     data = data.unsqueeze(0)
+#     return data
+
+# def infer_video(model, video, output, resize, max_size, mixed_precision=True, is_master=True, world=0,
+#           annotations=None, use_dali=True, is_validation=False, verbose=True, rotated_bbox=False):
+    
+#     backend = 'pytorch'
+
+#     stride = model.stride
+#     if torch.cuda.is_available(): model = model.cuda()
+#     model = amp.initialize(model, None,
+#                                    opt_level='O2' if mixed_precision else 'O0',
+#                                    keep_batchnorm_fp32=True,
+#                                    verbosity=0)
+    
+#     model.eval()
+#     results = []
+#     cap = cv2.VideoCapture(video)
+#     ret, frame = cap.read()
+#     frame_width, frame_height =cv2.GetSize(frame)
+#     out = cv2.VideoWriter(output,cv2.VideoWriter_fourcc('M','J','P','G'), 24, (frame_width,frame_height))
+#     with torch.no_grad():
+#         while (ret):
+#             ret, frame = cap.read()
+#             if ret:
+#                 data = preprocess(frame, stride=model.stride)
+#                 scores, boxes, classes = model(data, rotated_bbox)
+#                 for i, box in enumerate(boxes):
+#                     x ,y, w, h = box[0], box[1], box[2], box[3]
+#                     frame = cv2.rectangle(frame , (x,y), (x+w, y+h), (205,128,128), 2)
+#                     frame = cv2.putText(frame, str(score[i]), (x+w/2, y+h/2), cv2.FONT_HERSHEY_SIMPLEX, 1, (205,128,128), 2, cv2.LINE_AA)
+#                 out.write(frame)
+        
+#     cap.release()
+#     out.release()
+

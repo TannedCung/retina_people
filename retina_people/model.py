@@ -19,7 +19,7 @@ class Model(nn.Module):
         self, 
         backbones='ResNet50FPN', 
         classes=80, 
-        ratios=[1.0, 2.0, 0.5], 
+        ratios=[1.0, 1.75, 2.5], 
         scales=[4 * 2 ** (i / 3) for i in range(3)],
         angles=None, 
         rotated_bbox=False, 

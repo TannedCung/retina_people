@@ -30,6 +30,8 @@ def parse(args):
     parser_train.add_argument('--images', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                               default=['MobileNetV2FPN'])
+    parser_train.add_argument('--output', metavar='file', type=str, help='save detections to specified JSON file',
+                              default='detections.json')
     parser_train.add_argument('--last-checkpoint', action='store', type=str, help='path to the last checkpoint to resume training from')
     parser_train.add_argument('-cont', help='is training from last checkpoint', action='store_true')
     parser_train.add_argument('-reinit_opt', help='set another learning from last checkpoint', action='store_true')
@@ -83,6 +85,7 @@ def parse(args):
 
     parser_infer = subparsers.add_parser('infer', help='run inference')
     parser_infer.add_argument('model', type=str, help='path to model')
+    parser_infer.add_argument('--video', metavar='path', type=str, help='path to video', default='retinanet/data/7.mp4')
     parser_infer.add_argument('--images', metavar='path', type=str, help='path to images', default='.')
     parser_infer.add_argument('--annotations', metavar='annotations', type=str,
                               help='evaluate using provided annotations')
@@ -197,7 +200,7 @@ def worker(rank, args, world, model, state):
     #         if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
     #         model = Engine.load(args.model)
 
-    #     infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
+    #     infer.infer_video(model, args.video, args.output, args.resize, args.max_size, args.batch,
     #                 annotations=args.annotations, mixed_precision=not args.full_precision,
     #                 is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
     #                 rotated_bbox=args.rotated_bbox)

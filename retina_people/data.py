@@ -204,7 +204,7 @@ class DataIterator():
 
         self.sampler = data.distributed.DistributedSampler(self.dataset) if world > 1 else None
         self.dataloader = data.DataLoader(self.dataset, batch_size=batch_size // world,
-                                          sampler=self.sampler, collate_fn=self.dataset.collate_fn, num_workers=8,
+                                          sampler=self.sampler, collate_fn=self.dataset.collate_fn, num_workers=2,
                                           pin_memory=True)
 
     def __repr__(self):
@@ -448,13 +448,13 @@ class RotatedDataIterator():
                                           rotate_augment=rotate_augment,
                                           augment_brightness=augment_brightness,
                                           augment_contrast=augment_contrast, augment_hue=augment_hue,
-                                          augment_saturation=augment_saturation, absolute_angle=absolute_angle)
+                                          augment_saturation=augment_saturation, absolute_angle=absolute_angle) 
         self.ids = self.dataset.ids
         self.coco = self.dataset.coco
 
         self.sampler = data.distributed.DistributedSampler(self.dataset) if world > 1 else None
         self.dataloader = data.DataLoader(self.dataset, batch_size=batch_size // world,
-                                          sampler=self.sampler, collate_fn=self.dataset.collate_fn, num_workers=8,
+                                          sampler=self.sampler, collate_fn=self.dataset.collate_fn, num_workers=2,
                                           pin_memory=True)
 
     def __repr__(self):
