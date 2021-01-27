@@ -76,6 +76,26 @@ class Model(nn.Module):
             '  backbone: {}'.format(', '.join([k for k, _ in self.backbones.items()])),
             '   classes: {}, anchors: {}'.format(self.classes, self.num_anchors)
         ])
+    
+    @classmethod
+    def frozen(cls, model, backbone='MobileNetV2FPN'):
+        for c in model.children():
+            for param in c.parameters():
+                param.requires_grad = False
+        # unfrozen lasr layers
+        model.cls_head[8].weight.requires_grad=True
+        model.cls_head[8].bias.requires_grad=True
+        model.box_head[8].weight.requires_grad=True
+        model.box_head[8].bias.requires_grad=True
+        return model
+    
+    @classmethod
+    def unfrozen(cls, model):
+        for c in model.children():
+            for param in c.parameters():
+                param.requires_grad = True
+        return model
+
 
     def initialize(self, pre_trained):
         if pre_trained:
@@ -228,6 +248,33 @@ class Model(nn.Module):
                 checkpoint[key] = state[key]
 
         torch.save(checkpoint, state['path'])
+
+    @classmethod
+    def load_pretrained(cls, filename, rotated_bbox=False):
+        if not os.path.isfile(filename):
+            raise ValueError('No checkpoint {}'.format(filename))
+
+        checkpoint = torch.load(filename, map_location=lambda storage, loc: storage)
+        kwargs = {}
+        for i in ['ratios', 'scales', 'angles']:
+            if i in checkpoint:
+                kwargs[i] = checkpoint[i]
+        if ('angles' in checkpoint) or rotated_bbox:
+            kwargs['rotated_bbox'] = True
+        # Recreate model from checkpoint instead of from individual backbones
+        model = cls(backbones=checkpoint['backbone'], classes=checkpoint['classes'], **kwargs)
+        model.load_state_dict(checkpoint['state_dict'])
+
+        state = {}
+        for key in ('iteration', 'optimizer', 'scheduler'):
+            if key in checkpoint:
+                state[key] = checkpoint[key]
+
+        del checkpoint
+        torch.cuda.empty_cache()
+
+        return model, state
+
     # @classmethod
     def load(self, filename, rotated_bbox=False, reinit_opt=True):
         if not os.path.isfile(filename):

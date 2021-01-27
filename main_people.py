@@ -6,6 +6,7 @@ import random
 import torch.cuda
 import torch.distributed
 import torch.multiprocessing
+import random
 
 from retina_people import infer, train, utils
 from retina_people.model import Model
@@ -85,12 +86,17 @@ def parse(args):
 
     parser_infer = subparsers.add_parser('infer', help='run inference')
     parser_infer.add_argument('model', type=str, help='path to model')
+    parser_infer.add_argument('--anchor-ious', metavar='value value', type=float, nargs=2,
+                              help='anchor/bbox overlap threshold', default=[0.4, 0.5])
+    parser_infer.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
+    parser_infer.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
+                            default=['MobileNetV2FPN'])
     parser_infer.add_argument('--video', metavar='path', type=str, help='path to video', default='retinanet/data/7.mp4')
     parser_infer.add_argument('--images', metavar='path', type=str, help='path to images', default='.')
     parser_infer.add_argument('--annotations', metavar='annotations', type=str,
                               help='evaluate using provided annotations')
     parser_infer.add_argument('--output', metavar='file', type=str, help='save detections to specified JSON file',
-                              default='detections.json')
+                              default='output.mp4')
     parser_infer.add_argument('--batch', metavar='size', type=int, help='batch size', default=2 * devcount)
     parser_infer.add_argument('--resize', metavar='scale', type=int, help='resize to given size', default=800)
     parser_infer.add_argument('--max-size', metavar='max', type=int, help='maximum resizing size', default=1333)
@@ -139,12 +145,17 @@ def load_model(args, verbose=False):
         if args.cont:
             state = model.load(filename=args.last_checkpoint, rotated_bbox=args.rotated_bbox, reinit_opt=args.reinit_opt)
             print("INFO: Pretrained model loaded from {}".format(args.last_checkpoint))
-        # model.initialize(args.fine_tune)
+        if args.fine_tune:
+            model.initialize(args.fine_tune)
+            model = model.frozen(model)
         if verbose: print(model)
 
     elif ext == '.pth' or ext == '.torch':
         if verbose: print('Loading model from {}...'.format(os.path.basename(args.model)))
-        state = Model.load(filename=args.model, rotated_bbox=args.rotated_bbox)
+        model = Model(backbones=args.backbone, classes=args.classes, rotated_bbox=False,
+                      anchor_ious=args.anchor_ious)
+        state = model.load(filename=args.model, rotated_bbox=args.rotated_bbox, reinit_opt=False)
+
         print("about to load model from {}".format(args.model))
         if verbose: print(model)
 
@@ -195,15 +206,13 @@ def worker(rank, args, world, model, state):
                     augment_hue=args.augment_hue, augment_saturation=args.augment_saturation,
                     regularization_l2=args.regularization_l2, rotated_bbox=args.rotated_bbox, absolute_angle=args.absolute_angle)
 
-    # elif args.command == 'infer':
-    #     if model is None:
-    #         if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
-    #         model = Engine.load(args.model)
+    elif args.command == 'infer':
+        if model is None:
+            if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(args.model)))
+            model = Engine.load(args.model)
 
-    #     infer.infer_video(model, args.video, args.output, args.resize, args.max_size, args.batch,
-    #                 annotations=args.annotations, mixed_precision=not args.full_precision,
-    #                 is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=(rank == 0),
-    #                 rotated_bbox=args.rotated_bbox)
+        infer.infer_video(model, args.video, args.output, args.resize, args.max_size, mixed_precision=not args.full_precision,
+                    world=world)
 
     elif args.command == 'export':
         onnx_only = args.export.split('.')[-1] == 'onnx'

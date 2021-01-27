@@ -28,7 +28,8 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
         model = model.cuda()
 
     # Setup optimizer and schedule
-    optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+    # optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
 
     loss_scale = "dynamic" if use_dali else "128.0"
 
