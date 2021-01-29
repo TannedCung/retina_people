@@ -302,7 +302,7 @@ class Model(nn.Module):
         state = {}
         for key in ('iteration', 'optimizer', 'scheduler'):
             if key in checkpoint:
-                if key != 'optimizer': 
+                if key != 'optimizer' or key != 'scheduler': 
                     state[key] = checkpoint[key]
                 elif not reinit_opt:
                     state[key] = checkpoint[key]
