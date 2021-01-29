@@ -44,8 +44,8 @@ def infer(model, path, detections_file, resize, max_size, batch_size, mixed_prec
                                             world, annotations, training=False)
     else:
         data_iterator = (DaliDataIterator if use_dali else DataIterator)(
-            path, resize, max_size, batch_size, stride,
-            world, annotations, training=False)
+            path, None, annotations, None, resize, max_size, batch_size, stride,
+            world, training=False)
     if verbose: print(data_iterator)
 
     # Prepare model
@@ -177,7 +177,7 @@ def infer(model, path, detections_file, resize, max_size, batch_size, mixed_prec
 def preprocess(img, stride,resize, max_size, mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]):
     img = Image.fromarray(img).convert("RGB")
     ratio = resize / min(img.size)
-    if max(img.size) > max_size:
+    if ratio * max(img.size) > max_size:
         ratio = max_size / max(img.size)
         img = img.resize((int(ratio * d) for d in img.size), Image.BILINEAR)
     data = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
@@ -190,7 +190,7 @@ def preprocess(img, stride,resize, max_size, mean = [0.485, 0.456, 0.406], std =
     data = F.pad(data, (0, pw, 0, ph))
     data = data.unsqueeze(0)
     if torch.cuda.is_available(): data = data.cuda()
-    return data
+    return data, ratio
 
 def infer_video(model, video, output, resize, max_size, mixed_precision=True, is_master=True, world=0,
           annotations=None, use_dali=True, is_validation=False, verbose=True, rotated_bbox=False):
@@ -208,25 +208,45 @@ def infer_video(model, video, output, resize, max_size, mixed_precision=True, is
     results = []
     cap = cv2.VideoCapture(video)
     ret, frame = cap.read()
-    data = preprocess(frame, resize=resize, max_size=max_size, stride=model.stride)
-    frame_width, frame_height = data.shape[3], data.shape[2]
-    out = cv2.VideoWriter(output,cv2.VideoWriter_fourcc('X','V','I','D'), 24, (frame_width,frame_height))
+    data, ratio = preprocess(frame, resize=resize, max_size=max_size, stride=model.stride)
+    frame_width, frame_height = frame.shape[1], frame.shape[0]
+    # frame_width, frame_height = data.shape[3], data.shape[2]
+    out = cv2.VideoWriter(output, cv2.VideoWriter_fourcc('m','p','4','v'), 24, (frame_width,frame_height))
     start = time.time()
     count = 0
     with torch.no_grad():
         while (ret):
             ret, frame = cap.read()
             if ret:
-                data = preprocess(frame, resize=resize, max_size=max_size, stride=model.stride)
-                frame = cv2.resize(frame, (frame_width, frame_height),interpolation=cv2.INTER_LINEAR)
+                data, ratio = preprocess(frame, resize=resize, max_size=max_size, stride=model.stride)
+                # frame = cv2.resize(frame, (frame_width, frame_height),interpolation=cv2.INTER_LINEAR)
                 scores, boxes, classes = model(data, rotated_bbox)
-                for i, box in enumerate(boxes[0]):
-                    x1 ,y1, x2, y2 = int(box[0].cpu().numpy()), int(box[1].cpu().numpy()), int(box[2].cpu().numpy()), int(box[3].cpu().numpy())
-                    frame = cv2.rectangle(frame , (x1,y1), (x2, y2), (random.randint(0,255),random.randint(0,255),random.randint(0,255)), 2)
-                    frame = cv2.putText(frame, '{:.3}'.format(scores[0][i].item()), (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (205,128,128), 2, cv2.LINE_AA)
+                
+                for scores_, boxes_, classes_ in zip(scores, boxes, classes):
+                    scores_, boxes_, classes_ = scores_.cpu(), boxes_.cpu(), classes_.cpu()
+                    keep = (scores_ > 0.5).nonzero()
+                    scores_ = scores_[keep].view(-1)
+                    boxes_ = boxes_[keep, :].view(-1, 4) / ratio
+                    classes_ = classes_[keep].view(-1).int()
+                    only_person = (classes_ == 0)
+                    boxes_ = boxes_[only_person, :]
+                    # print(boxes_.shape)
+                    for box in boxes_:
+                        x1, y1, x2, y2 = box.data.numpy().astype(np.int32).tolist()
+                        x, y, w, h = x1, y1, x2 - x1 + 1, y2 - y1 + 1
+                        # print(x1, y1, x2, y2)
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+
+                # for i, box in enumerate(boxes[0]):
+                #     x1 ,y1, x2, y2 = int(box[0].cpu().numpy()), int(box[1].cpu().numpy()), int(box[2].cpu().numpy()), int(box[3].cpu().numpy())
+                #     frame = cv2.rectangle(frame , (x1,y1), (x2, y2), (random.randint(0,255),random.randint(0,255),random.randint(0,255)), 2)
+                #     frame = cv2.putText(frame, '{:.3}'.format(scores[0][i].item()), (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (205,128,128), 2, cv2.LINE_AA)
+                
                 out.write(frame)
                 count += 1
                 print(count)
+                if cv2.waitKey(0) & 0xFF == ord('q'):
+                    break
 
     print("[INFO]: Infered {} images in {:.3}s, avg {:.3}imgs/s".format(count, time.time()-start, count/(time.time()-start)))
         

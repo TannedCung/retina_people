@@ -7,8 +7,116 @@ import torch.nn.functional as F
 from torch.utils import data
 from pycocotools.coco import COCO
 import math
+import glob
 from torchvision.transforms.functional import adjust_brightness, adjust_contrast, adjust_hue, adjust_saturation
 
+
+class WIDERPersonDataset(data.dataset.Dataset):
+    def __init__(self, image, resize, max_size, stride, annotations_path,categories=[1, 3, 5], rotate_augment=False,
+                 augment_brightness=0.0, augment_contrast=0.0,
+                 augment_hue=0.0, augment_saturation=0.0):
+        super().__init__()
+        print(20*"-" + "WIDER Person" + 20*"-")
+        self.path = image
+        self.categories = categories
+        self.resize = resize
+        self.max_size = max_size
+        self.stride = stride
+        self.mean = [0.485, 0.456, 0.406]
+        self.std = [0.229, 0.224, 0.225]
+        self.rotate_augment = rotate_augment
+        self.augment_brightness = augment_brightness
+        self.augment_contrast = augment_contrast
+        self.augment_hue = augment_hue
+        self.augment_saturation = augment_saturation
+        self.annotations_path = annotations_path
+        self.annotations = list(glob.iglob(os.path.join(self.annotations_path, "*.txt")))
+        # self.image_paths = list(glob.iglob(os.path.join(self.path, "*.*")))
+        
+
+    def __len__(self):
+        return len(self.annotations)
+
+    def __getitem__(self, index):
+        this_name = self.annotations[index].split("/")[-1].replace("txt", "jpg")
+        this_file = open(self.annotations[index])
+        this_anno = this_file.readlines()
+        img = Image.open(os.path.join(self.path, this_name)).convert("RGB")
+        resize = self.resize
+
+        if isinstance(resize, list):
+            resize = random.randint(self.resize[0], self.resize[-1])
+
+        ratio = resize / min(img.size)
+        if ratio * max(img.size) > self.max_size:
+            ratio = self.max_size / max(img.size)
+        img = img.resize((int(ratio * d) for d in img.size), Image.BILINEAR)
+
+        boxes = []
+        categories = []
+        for anno in this_anno:
+            x1, y1, x2, y2 = anno.split()
+            x1 = int(x1)
+            y1 = int(y1)
+            x2 = int(x2)
+            y2 = int(y2)
+
+            boxes.append([x1, y1, x2, y2])
+            categories.append(0.0)
+
+        boxes = torch.Tensor(boxes) # if len(torch.Tensor(boxes).shape)>2 else torch.Tensor(boxes).unsqueeze(0)
+        categories = torch.Tensor(categories).unsqueeze(1)
+        boxes *= ratio
+
+        random_angle = random.randint(0, 3) * 90
+        if self.rotate_augment and random_angle != 0:
+            # rotate by random_angle degrees.
+            img = img.rotate(random_angle)
+            x, y, w, h = boxes[:, 0].clone(), boxes[:, 1].clone(), boxes[:, 2].clone(), boxes[:, 3].clone()
+            if random_angle == 90:
+                boxes[:, 0] = y - img.size[1] / 2 + img.size[0] / 2
+                boxes[:, 1] = img.size[0] / 2 + img.size[1] / 2 - x - w
+                boxes[:, 2] = h
+                boxes[:, 3] = w
+            elif random_angle == 180:
+                boxes[:, 0] = img.size[0] - x - w
+                boxes[:, 1] = img.size[1] - y - h
+            elif random_angle == 270:
+                boxes[:, 0] = img.size[0] / 2 + img.size[1] / 2 - y - h
+                boxes[:, 1] = x - img.size[0] / 2 + img.size[1] / 2
+                boxes[:, 2] = h
+                boxes[:, 3] = w
+
+        if random.randint(0, 1):
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            boxes[:, 0] = img.size[0] - boxes[:, 0] - boxes[:, 2]
+        if self.augment_brightness:
+            brightness_factor = random.normalvariate(1, self.augment_brightness)
+            brightness_factor = max(0, brightness_factor)
+            img = adjust_brightness(img, brightness_factor)
+        if self.augment_contrast:
+            contrast_factor = random.normalvariate(1, self.augment_contrast)
+            contrast_factor = max(0, contrast_factor)
+            img = adjust_contrast(img, contrast_factor)
+        if self.augment_hue:
+            hue_factor = random.normalvariate(0, self.augment_hue)
+            hue_factor = max(-0.5, hue_factor)
+            hue_factor = min(0.5, hue_factor)
+            img = adjust_hue(img, hue_factor)
+        if self.augment_saturation:
+            saturation_factor = random.normalvariate(1, self.augment_saturation)
+            saturation_factor = max(0, saturation_factor)
+            img = adjust_saturation(img, saturation_factor)
+        target = torch.cat([boxes, categories], dim=1)
+
+        data = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
+        data = data.float().div(255).view(*img.size[::-1], len(img.mode))
+        data = data.permute(2, 0, 1)
+        for t, mean, std in zip(data, self.mean, self.std):
+            t.sub_(mean).div_(std)
+        pw, ph = ((self.stride - d % self.stride) % self.stride for d in img.size)
+        data = F.pad(data, (0, pw, 0, ph))
+        return data, target
 
 class CocoDataset(data.dataset.Dataset):
     'Dataset looping through a set of images'
@@ -187,25 +295,47 @@ class CocoDataset(data.dataset.Dataset):
 class DataIterator():
     'Data loader for data parallel'
 
-    def __init__(self, path, resize, max_size, batch_size, stride, world, annotations, training=False,
+    def __init__(self, COCO_path, WIDER_path, COCO_annotations, WIDER_annotations, resize, max_size, batch_size, stride, world, training=False,
                  rotate_augment=False, augment_brightness=0.0,
                  augment_contrast=0.0, augment_hue=0.0, augment_saturation=0.0):
         self.resize = resize
         self.max_size = max_size
         print("jump in DataIterator")
-        self.dataset = CocoDataset(path, resize=resize, max_size=max_size,
-                                   stride=stride, annotations=annotations, training=training,
-                                   rotate_augment=rotate_augment,
-                                   augment_brightness=augment_brightness,
-                                   augment_contrast=augment_contrast, augment_hue=augment_hue,
-                                   augment_saturation=augment_saturation)
-        self.ids = self.dataset.ids
-        self.coco = self.dataset.coco
+        if training:
+            self.COCOdataset = CocoDataset(COCO_path, resize=resize, max_size=max_size,
+                                    stride=stride, annotations=COCO_annotations, training=training,
+                                    rotate_augment=rotate_augment,
+                                    augment_brightness=augment_brightness,
+                                    augment_contrast=augment_contrast, augment_hue=augment_hue,
+                                    augment_saturation=augment_saturation)
+            self.WIDERdataset = WIDERPersonDataset(WIDER_path, resize=resize, max_size=max_size,
+                                    stride=stride, annotations_path=WIDER_annotations,
+                                    rotate_augment=rotate_augment,
+                                    augment_brightness=augment_brightness,
+                                    augment_contrast=augment_contrast, augment_hue=augment_hue,
+                                    augment_saturation=augment_saturation)
 
-        self.sampler = data.distributed.DistributedSampler(self.dataset) if world > 1 else None
-        self.dataloader = data.DataLoader(self.dataset, batch_size=batch_size // world,
-                                          sampler=self.sampler, collate_fn=self.dataset.collate_fn, num_workers=2,
-                                          pin_memory=True)
+            self.ConcatedDataset = torch.utils.data.ConcatDataset([self.COCOdataset, self.WIDERdataset])                  
+            # self.ids = self.dataset.ids
+            # self.coco = self.dataset.coco
+
+            self.sampler = data.distributed.DistributedSampler(self.ConcatedDataset) if world > 1 else None
+            self.dataloader = data.DataLoader(self.ConcatedDataset, batch_size=batch_size // world,
+                                            sampler=self.sampler, collate_fn=self.COCOdataset.collate_fn, num_workers=2,
+                                            pin_memory=True)
+        else:
+            self.COCOdataset = CocoDataset(COCO_path, resize=resize, max_size=max_size,
+                                    stride=stride, annotations=COCO_annotations, training=training,
+                                    rotate_augment=rotate_augment,
+                                    augment_brightness=augment_brightness,
+                                    augment_contrast=augment_contrast, augment_hue=augment_hue,
+                                    augment_saturation=augment_saturation)
+            self.sampler = data.distributed.DistributedSampler(self.COCOdataset) if world > 1 else None
+            self.dataloader = data.DataLoader(self.COCOdataset, batch_size=batch_size // world,
+                                    sampler=self.sampler, collate_fn=self.COCOdataset.collate_fn, num_workers=2,
+                                    pin_memory=True)
+            self.ids = self.COCOdataset.ids
+            self.coco = self.COCOdataset.coco
 
     def __repr__(self):
         return '\n'.join([
@@ -218,7 +348,7 @@ class DataIterator():
 
     def __iter__(self):
         for output in self.dataloader:
-            if self.dataset.training:
+            if self.COCOdataset.training:
                 data, target = output
             else:
                 data, ids, ratio = output
@@ -226,7 +356,7 @@ class DataIterator():
             if torch.cuda.is_available():
                 data = data.cuda(non_blocking=True)
 
-            if self.dataset.training:
+            if self.COCOdataset.training:
                 if torch.cuda.is_available():
                     target = target.cuda(non_blocking=True)
                 yield data, target

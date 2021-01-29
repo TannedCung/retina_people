@@ -13,7 +13,7 @@ from .utils import ignore_sigint, post_metrics, Profiler
 from .infer import infer
 
 
-def train(model, state, path, annotations, val_path, val_annotations, resize, max_size, jitter, batch_size, iterations,
+def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotations, val_path, val_annotations, resize, max_size, jitter, batch_size, iterations,
           val_iterations, mixed_precision, lr, warmup, milestones, gamma, is_master=True, world=1, use_dali=True,
           verbose=True, metrics_url=None, logdir=None, rotate_augment=False, augment_brightness=0.0,
           augment_contrast=0.0, augment_hue=0.0, augment_saturation=0.0, regularization_l2=0.0001, rotated_bbox=False,
@@ -28,16 +28,17 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
         model = model.cuda()
 
     # Setup optimizer and schedule
-    # optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
-    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
+    optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+    # optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
 
     loss_scale = "dynamic" if use_dali else "128.0"
-
+    # model = model.unfrozen(model)
     model, optimizer = amp.initialize(model, optimizer,
                                       opt_level='O2' if mixed_precision else 'O0',
                                       keep_batchnorm_fp32=True,
                                       loss_scale=loss_scale,
                                       verbosity=is_master)
+    # model = model.frozen(model)
 
     if world > 1:
         model = DistributedDataParallel(model)
@@ -65,8 +66,8 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
                                             augment_saturation=augment_saturation, absolute_angle=absolute_angle)
     else:
         data_iterator = (DaliDataIterator if use_dali else DataIterator)(
-            path, jitter, max_size, batch_size, stride,
-            world, annotations, training=True, rotate_augment=rotate_augment, augment_brightness=augment_brightness,
+            COCOimages, WIDERimages, COCOannotations, WIDERannotations, jitter, max_size, batch_size, stride,
+            world, training=True, rotate_augment=rotate_augment, augment_brightness=augment_brightness,
             augment_contrast=augment_contrast, augment_hue=augment_hue, augment_saturation=augment_saturation)
     if verbose: print(data_iterator)
 
@@ -86,6 +87,8 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
 
     profiler = Profiler(['train', 'fw', 'bw'])
     iteration = state.get('iteration', 0)
+    # start_iteration = iteration
+    # stand_by = True
     while iteration < iterations:
         cls_losses, box_losses = [], []
         for i, (data, target) in enumerate(data_iterator):
@@ -173,6 +176,19 @@ def train(model, state, path, annotations, val_path, val_annotations, resize, ma
                       mixed_precision=mixed_precision, is_master=is_master, world=world, use_dali=use_dali,
                       is_validation=True, verbose=False, rotated_bbox=rotated_bbox)
                 model.train()
+            # if iteration-start_iteration >= milestones[0] and stand_by:
+            #     model, optimizer = model.unfrozen(model, optimizer)
+            #     stand_by = False
+
+                # optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+                # loss_scale = "dynamic" if use_dali else "128.0"
+
+                # mod, optimizer = amp.initialize(model, optimizer,
+                #                                 opt_level='O2' if mixed_precision else 'O0',
+                #                                 keep_batchnorm_fp32=True,
+                #                                 loss_scale=loss_scale,
+                #                                 verbosity=is_master)
+                print('[INFO]: model unfrozened')
 
             if (iteration==iterations and not rotated_bbox) or (iteration>iterations and rotated_bbox):
                 break

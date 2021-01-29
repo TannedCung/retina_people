@@ -46,6 +46,7 @@ class Model(nn.Module):
         self.classes = classes
 
         self.threshold = config.get('threshold', 0.05)
+        # self.threshold = 0.5
         self.top_n = config.get('top_n', 1000)
         self.nms = config.get('nms', 0.5)
         self.detections = config.get('detections', 100)
@@ -82,7 +83,7 @@ class Model(nn.Module):
         for c in model.children():
             for param in c.parameters():
                 param.requires_grad = False
-        # unfrozen lasr layers
+        # unfrozen last layers
         model.cls_head[8].weight.requires_grad=True
         model.cls_head[8].bias.requires_grad=True
         model.box_head[8].weight.requires_grad=True
@@ -92,9 +93,12 @@ class Model(nn.Module):
     @classmethod
     def unfrozen(cls, model):
         for c in model.children():
-            for param in c.parameters():
+            for name, param in c.named_parameters():
                 param.requires_grad = True
-        return model
+                # if name not in ['box_head.8.weight', 'box_head.8.bias, cls_head.8.weight, cls_head.8.bias']:
+                #     optimizer.add_param_group({'params': param})
+        
+        return model #, optimizer
 
 
     def initialize(self, pre_trained):

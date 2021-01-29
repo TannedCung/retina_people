@@ -1,7 +1,7 @@
 import torch
-# from ._C import decode as decode_cuda
-# from ._C import iou as iou_cuda
-# from ._C import nms as nms_cuda
+from ._C import decode as decode_cuda
+from ._C import iou as iou_cuda
+from ._C import nms as nms_cuda
 import numpy as np
 from .utils import order_points, rotate_boxes
 
@@ -288,13 +288,13 @@ def decode(all_cls_head, all_box_head, stride=1, threshold=0.05, top_n=1000, anc
         scores = torch.index_select(cls_head, 0, keep)
         scores, indices = torch.topk(scores, min(top_n, keep.size()[0]), dim=0)
         indices = torch.index_select(keep, 0, indices).view(-1)
-        classes = (indices / width / height) % num_classes
+        classes = (indices // height // width) % num_classes
         classes = classes.type(all_cls_head.type())
 
         # Infer kept bboxes
         x = indices % width
         y = (indices // width) % height
-        a = indices // num_classes // height // width
+        a = (indices // num_classes // height // width)%num_anchors
         box_head = box_head.view(num_anchors, num_boxes, height, width)
         boxes = box_head[a, :, y, x]
 

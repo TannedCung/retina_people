@@ -26,9 +26,12 @@ def parse(args):
 
     parser_train = subparsers.add_parser('train', help='train a network')
     parser_train.add_argument('model', type=str, help='path to output model or checkpoint to resume from')
-    parser_train.add_argument('--annotations', metavar='path', type=str, help='path to COCO style annotations',
+    parser_train.add_argument('--COCOannotations', metavar='path', type=str, help='path to COCO style annotations',
                               required=False, default="retinanet/data/annotations/person_keypoints_train2017.json")
-    parser_train.add_argument('--images', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
+    parser_train.add_argument('--WIDERannotations', metavar='path', type=str, help='path to COCO style annotations',
+                              required=False, default="retinanet/data/WiderPerson/Train_Annotations")
+    parser_train.add_argument('--COCOimages', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
+    parser_train.add_argument('--WIDERimages', metavar='path', type=str, help='path to images', default='retinanet/data/WiderPerson/Images')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                               default=['MobileNetV2FPN'])
     parser_train.add_argument('--output', metavar='file', type=str, help='save detections to specified JSON file',
@@ -155,6 +158,7 @@ def load_model(args, verbose=False):
         model = Model(backbones=args.backbone, classes=args.classes, rotated_bbox=False,
                       anchor_ious=args.anchor_ious)
         state = model.load(filename=args.model, rotated_bbox=args.rotated_bbox, reinit_opt=False)
+        # model, state = model.load_pretrained(filename=args.model, rotated_bbox=args.rotated_bbox)
 
         print("about to load model from {}".format(args.model))
         if verbose: print(model)
@@ -195,7 +199,7 @@ def worker(rank, args, world, model, state):
         # print(30*"-" + args.with_dali)
         # import os
         print(os.getcwd())
-        train.train(model, state, args.images, args.annotations,
+        train.train(model, state, args.COCOimages, args.WIDERimages, args.COCOannotations, args.WIDERannotations,
                     args.val_images or args.images, args.val_annotations, args.resize, args.max_size, args.jitter,
                     args.batch, int(args.iters * args.schedule), args.val_iters, not args.full_precision, args.lr,
                     args.warmup, [int(m * args.schedule) for m in args.milestones], args.gamma,
