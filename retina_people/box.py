@@ -1,7 +1,7 @@
 import torch
-from ._C import decode as decode_cuda
-from ._C import iou as iou_cuda
-from ._C import nms as nms_cuda
+# from ._C import decode as decode_cuda
+# from ._C import iou as iou_cuda
+# from ._C import nms as nms_cuda
 import numpy as np
 from .utils import order_points, rotate_boxes
 
