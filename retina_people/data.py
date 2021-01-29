@@ -315,7 +315,7 @@ class DataIterator():
                                     augment_contrast=augment_contrast, augment_hue=augment_hue,
                                     augment_saturation=augment_saturation)
 
-            self.ConcatedDataset = torch.utils.data.ConcatDataset([self.COCOdataset, self.WIDERdataset])                  
+            self.ConcatedDataset = torch.utils.data.ConcatDataset([self.WIDERdataset, self.COCOdataset])                  
             # self.ids = self.dataset.ids
             # self.coco = self.dataset.coco
 

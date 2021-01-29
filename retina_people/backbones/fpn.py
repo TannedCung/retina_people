@@ -5,6 +5,7 @@ from torchvision.models import mobilenet as vmn
 
 from .resnet import ResNet
 from .mobilenet import MobileNet
+from .mobilenet_custom import MobileNetLite
 from .utils import register
 
 
@@ -20,7 +21,7 @@ class FPN(nn.Module):
         if isinstance(features, ResNet):
             is_light = features.bottleneck == vrn.BasicBlock
             channels = [128, 256, 512] if is_light else [512, 1024, 2048]
-        elif isinstance(features, MobileNet):
+        elif isinstance(features, MobileNet) or isinstance(features, MobileNetLite):
             channels = [32, 96, 320]
 
         self.lateral3 = nn.Conv2d(channels[0], 256, 1)
@@ -91,3 +92,7 @@ def ResNeXt101_32x8dFPN():
 @register
 def MobileNetV2FPN():
     return FPN(MobileNet(outputs=[6, 13, 17], url=vmn.model_urls['mobilenet_v2']))
+
+@register
+def MobileNetV2LiteFPN():
+    return FPN(MobileNetLite(outputs=[4, 8, 11]))

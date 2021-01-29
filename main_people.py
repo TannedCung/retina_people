@@ -33,7 +33,7 @@ def parse(args):
     parser_train.add_argument('--COCOimages', metavar='path', type=str, help='path to images', default='/workspace/retinanet-examples/retinanet/data/train')
     parser_train.add_argument('--WIDERimages', metavar='path', type=str, help='path to images', default='retinanet/data/WiderPerson/Images')
     parser_train.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
-                              default=['MobileNetV2FPN'])
+                              default=['MobileNetV2LiteFPN'])
     parser_train.add_argument('--output', metavar='file', type=str, help='save detections to specified JSON file',
                               default='detections.json')
     parser_train.add_argument('--last-checkpoint', action='store', type=str, help='path to the last checkpoint to resume training from')

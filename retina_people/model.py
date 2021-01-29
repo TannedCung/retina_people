@@ -24,6 +24,7 @@ class Model(nn.Module):
         angles=None, 
         rotated_bbox=False, 
         anchor_ious=[0.4, 0.5], 
+        is_lite = False,
         config={}
     ):
         super().__init__()
@@ -37,6 +38,7 @@ class Model(nn.Module):
         self.exporting = False
         self.rotated_bbox = rotated_bbox
         self.anchor_ious = anchor_ious
+        self.is_lite = is_lite
 
         self.ratios = ratios
         self.scales = scales
@@ -57,10 +59,17 @@ class Model(nn.Module):
         # classification and box regression heads
         def make_head(out_size):
             layers = []
-            for _ in range(4):
-                layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
-            layers += [nn.Conv2d(256, out_size, 3, padding=1)]
-            return nn.Sequential(*layers)
+            if self.is_lite:
+                for _ in range(2):
+                    layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
+                    layers += [nn.Conv2d(256, out_size, 3, padding=1)]
+                    return nn.Sequential(*layers)
+            
+            else:
+                for _ in range(4):
+                    layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
+                    layers += [nn.Conv2d(256, out_size, 3, padding=1)]
+                    return nn.Sequential(*layers)
 
         self.num_anchors = len(self.ratios) * len(self.scales)
         self.num_anchors = self.num_anchors if not self.rotated_bbox else (self.num_anchors * len(self.angles))
@@ -84,11 +93,18 @@ class Model(nn.Module):
             for param in c.parameters():
                 param.requires_grad = False
         # unfrozen last layers
-        model.cls_head[8].weight.requires_grad=True
-        model.cls_head[8].bias.requires_grad=True
-        model.box_head[8].weight.requires_grad=True
-        model.box_head[8].bias.requires_grad=True
+        if not model.is_lite:
+            model.cls_head[8].weight.requires_grad=True
+            model.cls_head[8].bias.requires_grad=True
+            model.box_head[8].weight.requires_grad=True
+            model.box_head[8].bias.requires_grad=True
+        else:
+            model.cls_head[4].weight.requires_grad=True
+            model.cls_head[4].bias.requires_grad=True
+            model.box_head[4].weight.requires_grad=True
+            model.box_head[4].bias.requires_grad=True
         return model
+
     
     @classmethod
     def unfrozen(cls, model):
