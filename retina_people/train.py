@@ -53,6 +53,8 @@ def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotatio
         return gamma ** len([m for m in milestones if m <= train_iter])
 
     scheduler = LambdaLR(optimizer, schedule)
+    if 'scheduler' in state:
+        scheduler.load_state_dict(state['scheduler'])
 
     # Prepare dataset
     if verbose: print('Preparing dataset...')
