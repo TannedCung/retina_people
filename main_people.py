@@ -111,11 +111,17 @@ def parse(args):
     parser_export = subparsers.add_parser('export', help='export a model into a TensorRT engine')
     parser_export.add_argument('model', type=str, help='path to model')
     parser_export.add_argument('export', type=str, help='path to exported output')
+    parser_export.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
+                              default=['MobileNetV2FPN'])
+    parser_export.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_export.add_argument('--size', metavar='height width', type=int, nargs='+',
                                help='input size (square) or sizes (h w) to use when generating TensorRT engine',
-                               default=[1280])
+                               default=[840, 840])
     parser_export.add_argument('--batch', metavar='size', type=int, help='max batch size to use for TensorRT engine',
                                default=2)
+                            
+    parser_export.add_argument('--anchor-ious', metavar='value value', type=float, nargs=2,
+                              help='anchor/bbox overlap threshold', default=[0.4, 0.5])
     parser_export.add_argument('--full-precision', help='export in full instead of half precision', action='store_true')
     parser_export.add_argument('--int8', help='calibrate model and export in int8 precision', action='store_true')
     parser_export.add_argument('--calibration-batches', metavar='size', type=int,

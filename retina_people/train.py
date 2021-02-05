@@ -28,8 +28,8 @@ def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotatio
         model = model.cuda()
 
     # Setup optimizer and schedule
-    # optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
-    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
+    optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+    # optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
 
     loss_scale = "dynamic" if use_dali else "128.0"
     # model = model.unfrozen(model)
@@ -190,7 +190,7 @@ def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotatio
                 #                                 keep_batchnorm_fp32=True,
                 #                                 loss_scale=loss_scale,
                 #                                 verbosity=is_master)
-                print('[INFO]: model unfrozened')
+                # print('[INFO]: model unfrozened')
 
             if (iteration==iterations and not rotated_bbox) or (iteration>iterations and rotated_bbox):
                 break

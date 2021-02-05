@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from . import backbones as backbones_mod
-# from ._C import Engine
+from ._C import Engine
 from .box import generate_anchors, snap_to_anchors, decode, nms
 from .box import generate_anchors_rotated, snap_to_anchors_rotated, nms_rotated
 from .loss import FocalLoss, SmoothL1Loss
@@ -19,6 +19,7 @@ class Model(nn.Module):
         self, 
         backbones='ResNet50FPN', 
         classes=80, 
+        # ratios=[1.0, 2.0, 0.5],  
         ratios=[1.0, 1.75, 2.5], 
         scales=[4 * 2 ** (i / 3) for i in range(3)],
         angles=None, 
@@ -62,14 +63,14 @@ class Model(nn.Module):
             if self.is_lite:
                 for _ in range(2):
                     layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
-                    layers += [nn.Conv2d(256, out_size, 3, padding=1)]
-                    return nn.Sequential(*layers)
+                layers += [nn.Conv2d(256, out_size, 3, padding=1)]
+                return nn.Sequential(*layers)
             
             else:
                 for _ in range(4):
                     layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
-                    layers += [nn.Conv2d(256, out_size, 3, padding=1)]
-                    return nn.Sequential(*layers)
+                layers += [nn.Conv2d(256, out_size, 3, padding=1)]
+                return nn.Sequential(*layers)
 
         self.num_anchors = len(self.ratios) * len(self.scales)
         self.num_anchors = self.num_anchors if not self.rotated_bbox else (self.num_anchors * len(self.angles))
@@ -318,7 +319,7 @@ class Model(nn.Module):
         state = {}
         for key in ('iteration', 'optimizer', 'scheduler'):
             if key in checkpoint:
-                if key != 'optimizer' or key != 'scheduler': 
+                if key != 'optimizer' and key != 'scheduler': 
                     state[key] = checkpoint[key]
                 elif not reinit_opt:
                     state[key] = checkpoint[key]
@@ -346,13 +347,14 @@ class Model(nn.Module):
             # Here we hardcode scale=2 as a temporary workaround
             scales = g.op("Constant", value_t=torch.tensor([1., 1., 2., 2.]))
             empty_tensor = g.op("Constant", value_t=torch.tensor([], dtype=torch.float32))
-            return g.op("Resize", input, empty_tensor, scales, mode_s="nearest", nearest_mode_s="floor")
+            return g.op("Resize", input, empty_tensor, scales, mode_s="linear", nearest_mode_s="floor")
 
         onnx_symbolic.upsample_nearest2d = upsample_nearest2d
 
         # Export to ONNX
         print('Exporting to ONNX...')
         self.exporting = True
+        self.training = False
         onnx_bytes = io.BytesIO()
         zero_input = torch.zeros([1, 3, *size]).cuda()
         input_names = ['input_1']
@@ -379,7 +381,7 @@ class Model(nn.Module):
         else:
             anchors = [generate_anchors_rotated(stride, self.ratios, self.scales, 
                     self.angles)[0].view(-1).tolist() for stride in self.strides]
-
+        # print("[INFO] Building TensorRT engine...")
         return Engine(onnx_bytes.getvalue(), len(onnx_bytes.getvalue()), dynamic_batch_opts, precision,
                       self.threshold, self.top_n, anchors, self.rotated_bbox, self.nms, self.detections,
                       calibration_files, model_name, calibration_table, verbose)
