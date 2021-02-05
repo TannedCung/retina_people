@@ -61,8 +61,7 @@ class Model(nn.Module):
         def make_head(out_size):
             layers = []
             if self.is_lite:
-                for _ in range(2):
-                    layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
+                layers += [nn.Conv2d(256, 256, 3, padding=1), nn.ReLU()]
                 layers += [nn.Conv2d(256, out_size, 3, padding=1)]
                 return nn.Sequential(*layers)
             

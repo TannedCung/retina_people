@@ -38,6 +38,7 @@ def parse(args):
                               default='detections.json')
     parser_train.add_argument('--last-checkpoint', action='store', type=str, help='path to the last checkpoint to resume training from')
     parser_train.add_argument('-cont', help='is training from last checkpoint', action='store_true')
+    parser_train.add_argument('-is_lite', help='is the model a lite version', action='store_true')
     parser_train.add_argument('-reinit_opt', help='set another learning from last checkpoint', action='store_true')
     parser_train.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_train.add_argument('--batch', metavar='size', type=int, help='batch size', default=1)
@@ -149,7 +150,7 @@ def load_model(args, verbose=False):
     if args.command == 'train' and (not os.path.exists(args.model) or args.override):
         if verbose: print('Initializing model...')
         model = Model(backbones=args.backbone, classes=args.classes, rotated_bbox=args.rotated_bbox,
-                      anchor_ious=args.anchor_ious)
+                      anchor_ious=args.anchor_ious, is_lite=args.is_lite)
 
         if args.cont:
             state = model.load(filename=args.last_checkpoint, rotated_bbox=args.rotated_bbox, reinit_opt=args.reinit_opt)
