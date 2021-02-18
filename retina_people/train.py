@@ -3,6 +3,7 @@ from math import isfinite
 import torch
 from torch.optim import SGD, AdamW
 from torch.optim.lr_scheduler import LambdaLR
+from .adasopt_pytorch import Adas
 from apex import amp, optimizers
 from apex.parallel import DistributedDataParallel
 from .backbones.layers import convert_fixedbn_model
@@ -20,7 +21,7 @@ def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotatio
           absolute_angle=False):
     # 'Train the model on the given data"
     # Prepare model
-    nn_model =  model
+    nn_model = model
     stride = model.stride
 
     model = convert_fixedbn_model(model)
@@ -28,8 +29,9 @@ def train(model, state, COCOimages, WIDERimages, COCOannotations, WIDERannotatio
         model = model.cuda()
 
     # Setup optimizer and schedule
-    optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
+    # optimizer = SGD(model.parameters(), lr=lr, weight_decay=regularization_l2, momentum=0.9)
     # optimizer = AdamW(model.parameters(), lr=lr, weight_decay=regularization_l2)
+    optimizer = Adas(model.parameters(), lr=lr)
 
     loss_scale = "dynamic" if use_dali else "128.0"
     # model = model.unfrozen(model)

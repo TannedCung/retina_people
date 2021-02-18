@@ -95,6 +95,7 @@ def parse(args):
     parser_infer.add_argument('--classes', metavar='num', type=int, help='number of classes', default=1)
     parser_infer.add_argument('--backbone', action='store', type=str, nargs='+', help='backbone model (or list of)',
                             default=['MobileNetV2FPN'])
+    parser_infer.add_argument('-is_lite', help='is the model a lite version', action='store_true')
     parser_infer.add_argument('--video', metavar='path', type=str, help='path to video', default='retinanet/data/7.mp4')
     parser_infer.add_argument('--images', metavar='path', type=str, help='path to images', default='.')
     parser_infer.add_argument('--annotations', metavar='annotations', type=str,
@@ -163,7 +164,7 @@ def load_model(args, verbose=False):
     elif ext == '.pth' or ext == '.torch':
         if verbose: print('Loading model from {}...'.format(os.path.basename(args.model)))
         model = Model(backbones=args.backbone, classes=args.classes, rotated_bbox=False,
-                      anchor_ious=args.anchor_ious)
+                      anchor_ious=args.anchor_ious, is_lite=args.is_lite)
         state = model.load(filename=args.model, rotated_bbox=args.rotated_bbox, reinit_opt=False)
         # model, state = model.load_pretrained(filename=args.model, rotated_bbox=args.rotated_bbox)
 

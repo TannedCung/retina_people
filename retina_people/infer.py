@@ -233,10 +233,12 @@ def infer_video(model, video, output, resize, max_size, mixed_precision=True, is
                     # print(boxes_.shape)
                     for box in boxes_:
                         x1, y1, x2, y2 = box.data.numpy().astype(np.int32).tolist()
-                        x, y, w, h = x1, y1, x2 - x1 + 1, y2 - y1 + 1
+                        # x, y, w, h = x1, y1, x2 - x1 + 1, y2 - y1 + 1
                         # print(x1, y1, x2, y2)
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
-
+                        if x1 < x2 and y1 < y2:
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+                        else:
+                            print("[INFO]: got a bad detection ")
                 # for i, box in enumerate(boxes[0]):
                 #     x1 ,y1, x2, y2 = int(box[0].cpu().numpy()), int(box[1].cpu().numpy()), int(box[2].cpu().numpy()), int(box[3].cpu().numpy())
                 #     frame = cv2.rectangle(frame , (x1,y1), (x2, y2), (random.randint(0,255),random.randint(0,255),random.randint(0,255)), 2)
