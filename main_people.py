@@ -136,6 +136,7 @@ def parse(args):
     parser_export.add_argument('--verbose', help='enable verbose logging', action='store_true')
     parser_export.add_argument('--rotated-bbox', help='inference using a rotated bounding box model',
                                action='store_true')
+    parser_export.add_argument('-is_lite', help='is the model a lite version', action='store_true')
 
     return parser.parse_args(args)
 
